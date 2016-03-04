@@ -3,22 +3,13 @@
 
 require 'mecab'
 
-def acquire(streaming, redis, reply_pattern, catch_pattern, screen_name, tweetqueue)
+def acquire(streaming, redis, pattern_set, screen_name, tweetqueue)
   mecab = MeCab::Tagger.new
-  catch_keys = catch_pattern.keys.map { |e| Regexp.new(e) }
-  reply_keys = reply_pattern.keys.map { |e| Regexp.new(e) }
-
   streaming.user do |tweet|
     if tweet.class == Twitter::Tweet
-
-      reply = []
       all_words = []
       text = tweet.retweet? ? tweet.retweeted_tweet.text : text = tweet.text
-
-      text = text.gsub(/(@\w+)/,'@ ').
-      gsub(/https?:(\w|\/|\.)+/,'').
-      gsub(/\s/,'\n').gsub(/　/,'\n')
-
+      text = text.gsub(/(@\w+)/,'@ ').gsub(/https?:(\w|\/|\.)+/,'').gsub(/\s/,'\n').gsub(/　/,'\n')
       lines = text.split('\n')
       lines.each do |line|
         node = mecab.parseToNode(line)
@@ -38,25 +29,15 @@ def acquire(streaming, redis, reply_pattern, catch_pattern, screen_name, tweetqu
           end
         end
       end
-
       unless tweet.retweet?
-        if tweet.in_reply_to_screen_name == screen_name
-          reply_keys.each.with_index do |v, i|
-            reply << "@#{tweet.user.screen_name} #{reply_pattern.values[i]}" <<
-              {in_reply_to_status_id: tweet.id} if text =~ v && reply.empty?
-          end
-          reply << "@#{tweet.user.screen_name} #{build_tweet(redis, all_words[rand(all_words.length)] || '')}" <<
-            {in_reply_to_status_id: tweet.id} if reply.empty?
-        else
-          catch_keys.each.with_index do |v, i|
-            reply << "@#{tweet.user.screen_name} #{catch_pattern.values[i]}" <<
-              {in_reply_to_status_id: tweet.id} if text =~ v && reply.empty?
-          end
-        end
+        reply = tweet.in_reply_to_screen_name == screen_name ?
+        reply_catch(tweet, all_words, pattern_set[0], redis) :
+        tl_catch(tweet, pattern_set[1])
+        tweetqueue.push(reply) unless reply.empty?
       end
-
-      tweetqueue.push(reply)
-
     end
   end
+rescue => e
+  puts e
+  retry
 end

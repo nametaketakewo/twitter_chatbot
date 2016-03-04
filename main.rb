@@ -9,19 +9,20 @@ require 'hiredis'
 require './provisioning'
 require './acquire'
 require './build_tweet'
+require './reply_catch'
+require './tl_catch'
 
 Signal.trap(:INT) do
   exit!
 end
 
 begin
-
-  rest, streaming, redis, reply_pattern, catch_pattern = provisioning
+  rest, streaming, redis, pattern_set = provisioning
   screen_name = rest.user.screen_name
   tweetqueue = Queue.new
 
   Thread.new do
-    acquire(streaming, redis, reply_pattern, catch_pattern, screen_name, tweetqueue)
+    acquire(streaming, redis, pattern_set, screen_name, tweetqueue)
   end
 
   Thread.new do
@@ -38,17 +39,12 @@ begin
   loop do
     unless tweetqueue.empty?
       tweetqueue.size.times do
-        tweet = tweetqueue.pop
-        if tweet.class == String
-          rest.update(tweet)
-        else
-          rest.update(tweet[0], tweet[1])
-        end
+        tweet = tweetqueue.pop || break
+        tweet.class == String ? rest.update(tweet) : rest.update(tweet[0], tweet[1])
       end
     end
     sleep(5)
   end
-
 rescue => e
   puts 'error...'
   puts e

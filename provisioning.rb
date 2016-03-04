@@ -8,30 +8,32 @@ require 'hiredis'
 
 def provisioning
   begin
-    unless File.exist?('catch_pattern.yml')
-      File.open('catch_pattern.yml', 'w') do |file|
-        file.puts '---'
-      end
-    end
-    reply_pattern = YAML.load_file('reply_pattern.yml')
-  rescue
-    File.open('catch_pattern.yml', 'w') do |file|
-      file.puts '---'
-    end
-  end
-
-  begin
     unless File.exist?('reply_pattern.yml')
       File.open('reply_pattern.yml', 'w') do |file|
         file.puts '---'
       end
     end
-    catch_pattern = YAML.load_file('catch_pattern.yml')
+    reply_pattern = YAML.load_file('reply_pattern.yml')
   rescue
     File.open('reply_pattern.yml', 'w') do |file|
       file.puts '---'
     end
   end
+
+  begin
+    unless File.exist?('tl_pattern.yml')
+      File.open('tl_pattern.yml', 'w') do |file|
+        file.puts '---'
+      end
+    end
+    tl_pattern = YAML.load_file('tl_pattern.yml')
+  rescue
+    File.open('tl_pattern.yml', 'w') do |file|
+      file.puts '---'
+    end
+  end
+
+  pattern_set = [reply_pattern, tl_pattern]
 
   unless File.exist?('userconf.yml')
     twitter_conf_sample = { twitter:
@@ -67,7 +69,7 @@ def provisioning
     redis = redis_conf ? Redis.new(redis_conf) : Redis.new
     raise unless redis.class == Redis
   rescue
-    redis = Redis.new
+    puts 'Redisの設定に失敗しました。RedisServerが起動しているか確認してください。'
   end
-  return rest, streaming, redis, catch_pattern, reply_pattern
+  return rest, streaming, redis, pattern_set
 end
