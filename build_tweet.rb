@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
-#
+# coding: utf-8
+
+require 'nkf'
 
 def build_tweet(redis, keyword = '')
   keyword = '' if redis.hkeys(keyword) == [] || keyword.nil?
@@ -18,5 +20,5 @@ def build_tweet(redis, keyword = '')
     tweet << keyword if !keyword.nil?
     break if keyword == '' || keyword.nil?
   end
-  tweet[0..120]
+  NKF.nkf('-wxm0', tweet[0..120])
 end
