@@ -3,38 +3,39 @@
 
 require 'mecab'
 
-def acquire(streaming, redis, pattern_set, screen_name, tweetqueue)
+def acquire(streaming, rest, redis, pattern_set, screen_name, tweetqueue)
   mecab = MeCab::Tagger.new
-  streaming.user do |tweet|
-    if tweet.class == Twitter::Tweet
-      all_words = []
-      text = tweet.retweet? ? tweet.retweeted_tweet.text : text = tweet.text
-      text = text.gsub(/(@\w+)/,'@ ').gsub(/https?:(\w|\/|\.)+/,'').gsub(/\s/,'\n').gsub(/　/,'\n')
-      lines = text.split('\n')
+  streaming.user do |object|
+    if object.is_a?(Twitter::Tweet) && !object.retweet?
+      set = []
+      tweet = object.text
+      tweet = tweet.gsub(%r{@\w+|https?:[\w\.\$\?\(\)\+\-:%&~=/#]+}, '')
+      .gsub(/\w+\s/){|w| w.delete(' ')}
+      .gsub(/\s|　|\\n/, "\n")
+      lines = tweet.split("\n")
       lines.each do |line|
+        word = []
         node = mecab.parseToNode(line)
-        words = []
         while node do
-          words << node.surface
-          all_words << node.surface
+          word << node.surface
+          set << [node.surface, node.feature] if !node.surface.empty?
           node = node.next
         end
-        words.each.with_index do |word, i|
-          if i < words.length - 1
-            if redis.hkeys(word) != []
-              redis.hset(word, words[i + 1], 1)
-            else
-              redis.hset(word, words[i + 1],redis.hget(word, words[i + 1]).to_i + 1)
-            end
+        (word.length - 1).times do |i|
+          redis.hincrby(word[i], word[i + 1], 2)
+          if !word[i].empty? && !word[i + 1].nil? && !word[i + 1].empty?
+            redis.hincrby(word[i] + word[i + 1], word[i + 2], 1)
+          end
+          if !word[i + 2].nil? && !word[i + 2].empty?
+            redis.hincrby(word[i], word[i + 1] + word[i + 2], 1)
           end
         end
       end
-      unless tweet.retweet?
-        reply = tweet.in_reply_to_screen_name == screen_name ?
-        reply_catch(tweet, all_words, pattern_set[0], redis) :
-        tl_catch(tweet, pattern_set[1])
-        tweetqueue.push(reply) unless reply.empty?
-      end
+
+      tweetqueue.push(reply_catch(object, set, pattern_set, redis)) if object.in_reply_to_screen_name == screen_name
+
+    elsif object.is_a?(Twitter::Streaming::Event) && object.target_object.nil?
+      rest.follow(object.source.id) if !ARGV.include?('--debug')
     end
   end
 rescue => e

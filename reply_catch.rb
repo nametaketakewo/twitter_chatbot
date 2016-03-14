@@ -1,17 +1,21 @@
 #!/usr/bin/env ruby
 #
 
-def reply_catch(tweet, word_set, reply_pattern, redis)
+def reply_catch(tweet, set, reply_pattern, redis)
   reply_keys = reply_pattern.keys.map { |e| Regexp.new(e) }
-  reply = []
   reply_keys.each.with_index do |v, i|
-    reply << "@#{tweet.user.screen_name}
-    #{reply_pattern[0].values[i]}" <<
-      { in_reply_to_status_id: tweet.id } if tweet.text =~ v && reply.empty?
+    if tweet.text =~ v
+      reply = ["@#{tweet.user.screen_name}
+      #{reply_pattern.values[i]}", { in_reply_to_status_id: tweet.id }]
+      return reply
+    end
   end
+
+  a = set.select { |item| item[1].split(',')[0] == '動詞' } .map { |item| item[0] } .sample || set.sample[0]
+  b = set.select { |item| item[1].split(',')[0] == '名詞' } .map { |item| item[0] } .sample || set.sample[0]
+  sample = (redis.hkeys(a) & redis.hkeys(b)) .sample || ''
   reply << "@#{tweet.user.screen_name}
-  #{build_tweet(redis, word_set[rand(word_set.length)] || '')}" <<
-    { in_reply_to_status_id: tweet.id } if reply.empty?
+  #{build_tweet(redis, sample)}" << { in_reply_to_status_id: tweet.id }
   reply
 rescue => e
   puts e

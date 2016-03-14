@@ -14,8 +14,8 @@ def build_tweet(redis, keyword = '')
       end
       r
     end.flatten
-    keyword = candidates[rand(candidates.length)]
-    tweet << keyword unless keyword.nil?
+    keyword = candidates.sample
+    tweet << keyword if !keyword.nil?
     break if keyword == '' || keyword.nil?
   end
   tweet[0..120]

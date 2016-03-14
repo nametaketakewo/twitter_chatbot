@@ -1,3 +1,2 @@
-userconf.yml
-reply_pattern.yml
-tl_pattern.yml
+*.yml
+*.yaml

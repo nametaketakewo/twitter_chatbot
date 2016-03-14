@@ -20,20 +20,7 @@ def provisioning
     end
   end
 
-  begin
-    unless File.exist?('tl_pattern.yml')
-      File.open('tl_pattern.yml', 'w') do |file|
-        file.puts '---'
-      end
-    end
-    tl_pattern = YAML.load_file('tl_pattern.yml')
-  rescue
-    File.open('tl_pattern.yml', 'w') do |file|
-      file.puts '---'
-    end
-  end
-
-  pattern_set = [reply_pattern, tl_pattern]
+  pattern_set = reply_pattern
 
   unless File.exist?('userconf.yml')
     twitter_conf_sample = { twitter:
@@ -52,8 +39,8 @@ def provisioning
     twitter_conf = YAML.load_file('userconf.yml')['twitter']
     rest = Twitter::REST::Client.new(twitter_conf)
     streaming = Twitter::Streaming::Client.new(twitter_conf)
-    raise unless rest.class == Twitter::REST::Client
-    raise unless streaming.class == Twitter::Streaming::Client
+    raise unless rest.is_a?(Twitter::REST::Client)
+    raise unless streaming.is_a?(Twitter::Streaming::Client)
   rescue
     puts 'Twitterの設定に失敗しました。userconf.ymlの設定を確認してください。'
     puts '設定ファイルの雛形をuserconf.ymlに出力しますか?[y/N]'
@@ -67,7 +54,7 @@ def provisioning
   begin
     redis_conf = YAML.load_file('userconf.yml')['redis']
     redis = redis_conf ? Redis.new(redis_conf) : Redis.new
-    raise unless redis.class == Redis
+    raise unless redis.is_a?(Redis)
   rescue
     puts 'Redisの設定に失敗しました。RedisServerが起動しているか確認してください。'
   end
